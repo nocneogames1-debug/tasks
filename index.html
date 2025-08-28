@@ -7,64 +7,25 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
   <style>
-    html, body {
-  height: 100%;
-  margin: 0;           /* remove default body margin */
-}
+    html, body { height: 100%; margin: 0; }
+    .container { max-width: 90%; width: 100%; padding: 0; margin-top: 10px; }
 
-.container {           /* override Materialize's fixed width container */
-  max-width: 90%;
-  width: 100%;
-  padding: 0;
-  margin-top: 10px;
-}
+    #listsContainer {
+      display: flex; flex-wrap: nowrap; gap: 16px; margin-top: 20px;
+      min-height: 50vh; overflow-x: auto;
+    }
+    .list-card { flex: 1 1 auto; height: auto; }
+    .list-card .card { height: 100%; margin: 0; border-radius: 0; box-shadow: none; }
 
-#listsContainer {
-  display: flex;
-  flex-wrap: nowrap;   /* keep in one row */
-  gap: 16px;           /* space between cards */
-  margin-top: 20px;
-  min-height: 50vh;
-  overflow-x: auto;    /* allow scrolling if many cards */
-}
+    .item-actions { display: flex; flex-direction: row; align-items: center; gap: 2px; flex-wrap: nowrap; }
+    .item-actions .chip { white-space: nowrap; }
 
-.list-card {
-  flex: 1 1 auto;
-  height: auto;
-}
+    .status-select {
+      font-size: 0; width: 20px; height: 20px; padding: 0; border: none; background-color: transparent;
+      -webkit-appearance: menulist;
+    }
+    .status-select option { font-size: 0.85rem; }
 
-
-.list-card .card {
-  height: 100%;
-  margin: 0;
-  border-radius: 0;    /* optional: edge-to-edge look */
-  box-shadow: none;    /* optional: remove shadow for full-bleed feel */
-}
-.item-actions {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 2px;
-  flex-wrap: nowrap;
-}
-.item-actions .chip {
-  white-space: nowrap; /* prevent chip text from wrapping */
-}
-.status-select {
-  font-size: 0;          /* hide the displayed text */
-  width: 20px;           /* make it just wide enough for the arrow */
-  height: 20px;
-  padding: 0;
-  border: none;          /* optional: remove border */
-  background-color: transparent; /* optional: transparent background */
-  -webkit-appearance: menulist;  /* keep native arrow */
-}
-
-.status-select option {
-  font-size: 0.85rem;    /* still show text in dropdown list */
-}
-
-    /* Status chip color helpers */
     .chip.status-pending { background-color: #9e9e9e; color: #fff; }
     .chip.status-inprogress { background-color: #2196f3; color: #fff; }
     .chip.status-done { background-color: #43a047; color: #fff; }
@@ -88,7 +49,8 @@
       </div>
     </div>
 
-    <div id="listsContainer"srt></div>
+    <!-- fixed typo: removed stray 'srt' -->
+    <div id="listsContainer"></div>
   </div>
 
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -97,16 +59,12 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
     import {
-      getFirestore,
-      collection,
-      addDoc,
-      updateDoc,
-      arrayUnion,
-      arrayRemove,
-      deleteDoc,
-      onSnapshot,
-      doc
+      getFirestore, collection, addDoc, updateDoc, arrayUnion, arrayRemove,
+      deleteDoc, onSnapshot, doc
     } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+    import {
+      getAuth, signInAnonymously, onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBNv4_A_a9VDsJZeOUWMKwOUnpGOokUlFs",
@@ -119,20 +77,34 @@
     };
 
     const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    const db  = getFirestore(app);
+    const auth = getAuth(app);
+
     const listsCol = collection(db, "lists");
 
-    onSnapshot(listsCol, (snapshot) => {
-      document.getElementById("listsContainer").innerHTML = "";
-      snapshot.forEach(docSnap => {
-        renderList(docSnap.id, docSnap.data());
-      });
-    });
+    // ---- helpers
+    const toast = (html) => window.M?.toast({ html }) || alert(html);
 
+    function getTimeColor(timeStr) {
+      const itemDate = new Date(timeStr);
+      const diffHours = (Date.now() - itemDate.getTime()) / 36e5;
+      if (diffHours < 2) return "green-text";
+      if (diffHours < 10) return "orange-text";
+      return "red-text";
+    }
+    function getStatusChipClass(status) {
+      const s = (status || "Pending").toLowerCase();
+      if (s === "done") return "status-done";
+      if (s.includes("progress")) return "status-inprogress";
+      if (s === "blocked") return "status-blocked";
+      return "status-pending";
+    }
+
+    // ---- UI actions (unchanged)
     window.createList = async function () {
       const titleInput = document.getElementById("listTitle");
       const title = titleInput.value.trim();
-      if (!title) return M.toast({ html: "Please enter a list title" });
+      if (!title) return toast("Please enter a list title");
       await addDoc(listsCol, { title, items: [] });
       titleInput.value = "";
     };
@@ -141,15 +113,13 @@
       const inputId = `${listId}-itemTitle`;
       const itemInput = document.getElementById(inputId);
       const itemTitle = itemInput.value.trim();
-      if (!itemTitle) return M.toast({ html: "Please enter an item title" });
+      if (!itemTitle) return toast("Please enter an item title");
 
       const time = new Date().toLocaleString();
       const status = "Pending";
 
       const listRef = doc(db, "lists", listId);
-      await updateDoc(listRef, {
-        items: arrayUnion({ title: itemTitle, time, status })
-      });
+      await updateDoc(listRef, { items: arrayUnion({ title: itemTitle, time, status }) });
       itemInput.value = "";
     };
 
@@ -168,48 +138,29 @@
       const newTitleRaw = prompt("Edit item title:", item.title);
       if (newTitleRaw === null) return;
       const newTitle = newTitleRaw.trim();
-      if (!newTitle) return M.toast({ html: "Title cannot be empty" });
+      if (!newTitle) return toast("Title cannot be empty");
       if (newTitle === item.title) return;
 
       const listRef = doc(db, "lists", listId);
       await updateDoc(listRef, { items: arrayRemove(item) });
       await updateDoc(listRef, { items: arrayUnion({ title: newTitle, time: item.time, status: item.status || "Pending" }) });
-      M.toast({ html: "Item updated" });
+      toast("Item updated");
     };
 
-    // Change status function
     window.changeStatus = async function (listId, item, newStatus) {
       const listRef = doc(db, "lists", listId);
       await updateDoc(listRef, { items: arrayRemove(item) });
       await updateDoc(listRef, { items: arrayUnion({ title: item.title, time: item.time, status: newStatus }) });
-      M.toast({ html: "Status updated" });
+      toast("Status updated");
     };
-
-    function getTimeColor(timeStr) {
-      const itemDate = new Date(timeStr);
-      const now = new Date();
-      const diffMs = now - itemDate;
-      const diffHours = diffMs / (1000 * 60 * 60);
-      if (diffHours < 2) return "green-text";
-      if (diffHours < 10) return "orange-text";
-      return "red-text";
-    }
-
-    function getStatusChipClass(status) {
-      const s = (status || "Pending").toLowerCase();
-      if (s === "done") return "status-done";
-      if (s.includes("progress")) return "status-inprogress";
-      if (s === "blocked") return "status-blocked";
-      return "status-pending";
-    }
 
     window.renderList = function (id, data) {
       const itemsHTML = (data.items || []).map(item => `
-        <li class="collection-item" >
+        <li class="collection-item">
           <div class="item-column">
             <div>
               <strong style="font-size:30px">${item.title}</strong><br>
-              <span class="${getTimeColor(item.time)}">${item.time}</span>
+              <span class="${getTimeColor(item.time)}">${item.time || ""}</span>
             </div>
             <div class="item-actions">
               <span class="chip ${getStatusChipClass(item.status)}">${item.status || 'Pending'}</span>
@@ -233,7 +184,7 @@
         <div class="list-card" id="${id}">
           <div class="card">
             <div class="card-content">
-              <div class="card-title" style="display: flex; justify-content: center; align-items: flex-start;">
+              <div class="card-title" style="display:flex; justify-content:center; align-items:flex-start; gap:8px;">
                 ${data.title}
                 <a href="#!" class="red-text" onclick="deleteList('${id}')" title="Delete List">
                   <i class="material-icons">delete</i>
@@ -256,6 +207,35 @@
       const card = document.getElementById("createListCard");
       card.style.display = card.style.display === "none" ? "block" : "none";
     };
+
+    // ---- AUTH FIRST, THEN LISTEN ----
+    function startListenerWhenReady() {
+      onSnapshot(
+        listsCol,
+        (snapshot) => {
+          const container = document.getElementById("listsContainer");
+          container.innerHTML = "";
+          snapshot.forEach(docSnap => { renderList(docSnap.id, docSnap.data()); });
+        },
+        (err) => {
+          console.error("onSnapshot error:", err);
+          toast(`Firestore error: ${err.code || err.message}`);
+        }
+      );
+    }
+
+    onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        // Sign in anonymously to satisfy rules requiring request.auth != null
+        signInAnonymously(auth).catch((e) => {
+          console.error("Anonymous sign-in failed:", e);
+          toast("Anonymous sign-in failed. Check Firebase Auth setup.");
+        });
+        return;
+      }
+      // Auth OK -> attach listeners
+      startListenerWhenReady();
+    });
   </script>
 </body>
 </html>
