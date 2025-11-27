@@ -4,71 +4,90 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Firebase List Manager</title>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet" />
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+
+  <!-- Materialize CSS & Icons -->
+  <link
+    href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"
+    rel="stylesheet"
+  />
+  <link
+    href="https://fonts.googleapis.com/icon?family=Material+Icons"
+    rel="stylesheet"
+  />
+
   <style>
     html, body {
-  height: 100%;
-  margin: 0;           /* remove default body margin */
-}
+      height: 100%;
+      margin: 0; /* remove default body margin */
+    }
 
-.container {           /* override Materialize's fixed width container */
-  max-width: 90%;
-  width: 100%;
-  padding: 0;
-  margin-top: 10px;
-}
+    .container {
+      max-width: 90%;
+      width: 100%;
+      padding: 0;
+      margin-top: 10px;
+    }
 
-#listsContainer {
-  display: flex;
-  flex-wrap: nowrap;   /* keep in one row */
-  gap: 16px;           /* space between cards */
-  margin-top: 20px;
-  min-height: 50vh;
-  overflow-x: auto;    /* allow scrolling if many cards */
-}
+    #listsContainer {
+      display: flex;
+      flex-wrap: nowrap;   /* keep in one row */
+      gap: 16px;           /* space between cards */
+      margin-top: 20px;
+      min-height: 50vh;
+      overflow-x: auto;    /* allow scrolling if many cards */
+    }
 
-.list-card {
-  flex: 1 1 auto;
-  height: auto;
-}
+    .list-card {
+      flex: 1 1 auto;
+      height: auto;
+    }
 
+    .list-card .card {
+      height: 100%;
+      margin: 0;
+      border-radius: 0;    /* edge-to-edge look */
+      box-shadow: none;    /* remove shadow for full-bleed feel */
+    }
 
-.list-card .card {
-  height: 100%;
-  margin: 0;
-  border-radius: 0;    /* optional: edge-to-edge look */
-  box-shadow: none;    /* optional: remove shadow for full-bleed feel */
-}
-.item-actions {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 2px;
-  flex-wrap: nowrap;
-}
-.item-actions .chip {
-  white-space: nowrap; /* prevent chip text from wrapping */
-}
-.status-select {
-  font-size: 0;          /* hide the displayed text */
-  width: 20px;           /* make it just wide enough for the arrow */
-  height: 20px;
-  padding: 0;
-  border: none;          /* optional: remove border */
-  background-color: transparent; /* optional: transparent background */
-  -webkit-appearance: menulist;  /* keep native arrow */
-}
+    .item-column {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: nowrap;
+    }
 
-.status-select option {
-  font-size: 0.85rem;    /* still show text in dropdown list */
-}
+    .item-actions {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 2px;
+      flex-wrap: nowrap;
+    }
+
+    .item-actions .chip {
+      white-space: nowrap; /* prevent chip text from wrapping */
+    }
+
+    .status-select {
+      font-size: 0;          /* hide the displayed text */
+      width: 20px;           /* make it just wide enough for the arrow */
+      height: 20px;
+      padding: 0;
+      border: none;          /* remove border */
+      background-color: transparent;
+      -webkit-appearance: menulist; /* keep native arrow */
+    }
+
+    .status-select option {
+      font-size: 0.85rem;    /* show text in dropdown list */
+    }
 
     /* Status chip color helpers */
-    .chip.status-pending { background-color: #9e9e9e; color: #fff; }
-    .chip.status-inprogress { background-color: #2196f3; color: #fff; }
-    .chip.status-done { background-color: #43a047; color: #fff; }
-    .chip.status-blocked { background-color: #e53935; color: #fff; }
+    .chip.status-pending   { background-color: #9e9e9e; color: #fff; }
+    .chip.status-inprogress{ background-color: #2196f3; color: #fff; }
+    .chip.status-done      { background-color: #43a047; color: #fff; }
+    .chip.status-blocked   { background-color: #e53935; color: #fff; }
   </style>
 </head>
 <body class="grey lighten-4">
@@ -88,55 +107,65 @@
       </div>
     </div>
 
-    <div id="listsContainer"srt></div>
+    <!-- FIXED: removed stray "srt" -->
+    <div id="listsContainer"></div>
   </div>
 
+  <!-- jQuery & Materialize JS -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
     import {
-      getFirestore,
-      collection,
-      addDoc,
-      updateDoc,
-      arrayUnion,
-      arrayRemove,
-      deleteDoc,
-      onSnapshot,
-      doc
-    } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+      getDatabase,
+      ref,
+      push,
+      set,
+      update,
+      remove,
+      onValue
+    } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-database.js";
 
     const firebaseConfig = {
-      apiKey: "AIzaSyBNv4_A_a9VDsJZeOUWMKwOUnpGOokUlFs",
-      authDomain: "tasks-8e65a.firebaseapp.com",
-      projectId: "tasks-8e65a",
-      storageBucket: "tasks-8e65a.appspot.com",
-      messagingSenderId: "597818811041",
-      appId: "1:597818811041:web:93720931d864b3ea9706e0",
-      measurementId: "G-CYE13L85HF"
+      apiKey: "AIzaSyCzPWdy_OV58F_0oqIR78IsOOyDfnr4jFI",
+      authDomain: "tasks-c932d.firebaseapp.com",
+      databaseURL: "https://tasks-c932d-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "tasks-c932d",
+      storageBucket: "tasks-c932d.firebasestorage.app",
+      messagingSenderId: "1019360691349",
+      appId: "1:1019360691349:web:e3b8f3d08e274707fc479c",
+      measurementId: "G-W40TB64JV8"
     };
 
+    // Init app + Realtime Database
     const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const listsCol = collection(db, "lists");
+    const db = getDatabase(app);
+    const listsRef = ref(db, "lists");
 
-    onSnapshot(listsCol, (snapshot) => {
-      document.getElementById("listsContainer").innerHTML = "";
-      snapshot.forEach(docSnap => {
-        renderList(docSnap.id, docSnap.data());
+    // Listen to all lists in realtime
+    onValue(listsRef, (snapshot) => {
+      const container = document.getElementById("listsContainer");
+      container.innerHTML = "";
+      snapshot.forEach((childSnap) => {
+        const id = childSnap.key;   // list id
+        const data = childSnap.val();
+        renderList(id, data);
       });
     });
 
+    // Create a new list
     window.createList = async function () {
       const titleInput = document.getElementById("listTitle");
       const title = titleInput.value.trim();
       if (!title) return M.toast({ html: "Please enter a list title" });
-      await addDoc(listsCol, { title, items: [] });
+
+      const newListRef = push(listsRef);
+      await set(newListRef, { title, items: {} });
       titleInput.value = "";
     };
 
+    // Add item to a list
     window.addItem = async function (listId) {
       const inputId = `${listId}-itemTitle`;
       const itemInput = document.getElementById(inputId);
@@ -146,45 +175,44 @@
       const time = new Date().toLocaleString();
       const status = "Pending";
 
-      const listRef = doc(db, "lists", listId);
-      await updateDoc(listRef, {
-        items: arrayUnion({ title: itemTitle, time, status })
-      });
+      const itemsRef = ref(db, `lists/${listId}/items`);
+      const newItemRef = push(itemsRef);
+      await set(newItemRef, { title: itemTitle, time, status });
       itemInput.value = "";
     };
 
+    // Delete an entire list
     window.deleteList = async function (listId) {
-      if (confirm("Are you sure you want to delete this list?")) {
-        await deleteDoc(doc(db, "lists", listId));
-      }
+      if (!confirm("Are you sure you want to delete this list?")) return;
+      await remove(ref(db, `lists/${listId}`));
     };
 
-    window.deleteItem = async function (listId, item) {
-      const listRef = doc(db, "lists", listId);
-      await updateDoc(listRef, { items: arrayRemove(item) });
+    // Delete a single item
+    window.deleteItem = async function (listId, itemId) {
+      await remove(ref(db, `lists/${listId}/items/${itemId}`));
     };
 
-    window.editItem = async function (listId, item) {
+    // Edit item title
+    window.editItem = async function (listId, itemId, item) {
       const newTitleRaw = prompt("Edit item title:", item.title);
       if (newTitleRaw === null) return;
       const newTitle = newTitleRaw.trim();
       if (!newTitle) return M.toast({ html: "Title cannot be empty" });
       if (newTitle === item.title) return;
 
-      const listRef = doc(db, "lists", listId);
-      await updateDoc(listRef, { items: arrayRemove(item) });
-      await updateDoc(listRef, { items: arrayUnion({ title: newTitle, time: item.time, status: item.status || "Pending" }) });
+      const itemRef = ref(db, `lists/${listId}/items/${itemId}`);
+      await update(itemRef, { title: newTitle });
       M.toast({ html: "Item updated" });
     };
 
-    // Change status function
-    window.changeStatus = async function (listId, item, newStatus) {
-      const listRef = doc(db, "lists", listId);
-      await updateDoc(listRef, { items: arrayRemove(item) });
-      await updateDoc(listRef, { items: arrayUnion({ title: item.title, time: item.time, status: newStatus }) });
+    // Change status
+    window.changeStatus = async function (listId, itemId, newStatus) {
+      const itemRef = ref(db, `lists/${listId}/items/${itemId}`);
+      await update(itemRef, { status: newStatus });
       M.toast({ html: "Status updated" });
     };
 
+    // === Helpers ===
     function getTimeColor(timeStr) {
       const itemDate = new Date(timeStr);
       const now = new Date();
@@ -203,9 +231,11 @@
       return "status-pending";
     }
 
+    // Render list + items (Realtime DB items = object, not array)
     window.renderList = function (id, data) {
-      const itemsHTML = (data.items || []).map(item => `
-        <li class="collection-item" >
+      const itemsObj = data.items || {};
+      const itemsHTML = Object.entries(itemsObj).map(([itemId, item]) => `
+        <li class="collection-item">
           <div class="item-column">
             <div>
               <strong style="font-size:30px">${item.title}</strong><br>
@@ -213,27 +243,31 @@
             </div>
             <div class="item-actions">
               <span class="chip ${getStatusChipClass(item.status)}">${item.status || 'Pending'}</span>
-              <select class="status-select browser-default" onchange='changeStatus("${id}", ${JSON.stringify(item)}, this.value)'>
+              <select
+                class="status-select browser-default"
+                onchange='changeStatus("${id}", "${itemId}", this.value)'
+              >
                 <option value="Pending" ${item.status === "Pending" ? "selected" : ""}>Pending</option>
                 <option value="In Progress" ${item.status === "In Progress" ? "selected" : ""}>In Progress</option>
                 <option value="Done" ${item.status === "Done" ? "selected" : ""}>Done</option>
                 <option value="Blocked" ${item.status === "Blocked" ? "selected" : ""}>Blocked</option>
               </select>
-              <a href="#!" onclick='editItem("${id}", ${JSON.stringify(item)})' title="Edit">
+              <a href="#!" onclick='editItem("${id}", "${itemId}", ${JSON.stringify(item)})' title="Edit">
                 <i class="material-icons">edit</i>
               </a>
-              <a href="#!" onclick='deleteItem("${id}", ${JSON.stringify(item)})' title="Delete">
+              <a href="#!" onclick='deleteItem("${id}", "${itemId}")' title="Delete">
                 <i class="material-icons red-text">delete</i>
               </a>
             </div>
           </div>
-        </li>`).join("");
+        </li>
+      `).join("");
 
       const listHTML = `
         <div class="list-card" id="${id}">
           <div class="card">
             <div class="card-content">
-              <div class="card-title" style="display: flex; justify-content: center; align-items: flex-start;">
+              <div class="card-title" style="display: flex; justify-content: center; align-items: flex-start; gap: 8px;">
                 ${data.title}
                 <a href="#!" class="red-text" onclick="deleteList('${id}')" title="Delete List">
                   <i class="material-icons">delete</i>
@@ -252,6 +286,7 @@
       document.getElementById("listsContainer").insertAdjacentHTML("beforeend", listHTML);
     };
 
+    // Toggle create list card
     window.toggleCreateList = function () {
       const card = document.getElementById("createListCard");
       card.style.display = card.style.display === "none" ? "block" : "none";
